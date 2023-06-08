@@ -22,14 +22,14 @@ func TestCURL(t *testing.T) {
 		Body: io.NopCloser(strings.NewReader(`{"foo":"bar"}`)),
 	}
 
-	c, err := New(r)
+	c, err := New(r, Timeout(10))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	expected := `curl -k -X 'POST' 'https://example.com/' -H 'Content-Type: application/json' -d '{"foo":"bar"}' --compressed`
+	expected := `curl -m 10 -X 'POST' 'https://example.com/' -H 'Content-Type: application/json' -d '{"foo":"bar"}'`
 
 	if c.String() != expected {
-		t.Fatalf("expected %s, got %s", expected, c.String())
+		t.Fatalf("expected: \n[%s]\ngot:\n [%s]", expected, c.String())
 	}
 }

@@ -8,40 +8,28 @@ import (
 	"strings"
 )
 
-type CURL struct {
-	tlsFlag bool
-	url     string
-	header  http.Header
-	body    string
-	method  string
+var longFormatOptionsMap = map[string]string{
+	"-X": "--request",
+	"-H": "--header",
+	"-d": "--data",
+	"-m": "--max-time",
+	"-x": "--proxy",
 }
 
-func (c *CURL) String() string {
-	if c == nil {
-		return ""
-	}
+type CURL struct {
+	url    string
+	body   string
+	method string
 
-	curl := []string{"curl"}
+	header http.Header
 
-	if c.tlsFlag {
-		curl = append(curl, "-k")
-	}
-
-	curl = append(curl, "-X", bashStr(c.method))
-
-	curl = append(curl, bashStr(c.url))
-
-	for k, v := range c.header {
-		curl = append(curl, "-H", bashStr(fmt.Sprintf("%s: %s", k, v[0])))
-	}
-
-	if c.body != "" {
-		curl = append(curl, "-d", bashStr(c.body))
-	}
-
-	curl = append(curl, "--compressed")
-
-	return strings.Join(curl, " ")
+	multiLine      bool
+	longFormat     bool
+	timeout        int
+	followRedirect bool
+	ignoreTLS      bool
+	proxy          string
+	outputFile     string
 }
 
 type Option func(*CURL)
@@ -57,6 +45,90 @@ func New(r *http.Request, opts ...Option) (*CURL, error) {
 	}
 
 	return curl, nil
+}
+
+func Format(longFormat, multiLine bool) Option {
+	return func(c *CURL) {
+		c.longFormat = longFormat
+		c.multiLine = multiLine
+	}
+}
+
+func Timeout(timeout int) Option {
+	return func(c *CURL) {
+		c.timeout = timeout
+	}
+}
+
+func FollowRedirect() Option {
+	return func(c *CURL) {
+		c.followRedirect = true
+	}
+}
+
+func Proxy(proxy string) Option {
+	return func(c *CURL) {
+		c.proxy = proxy
+	}
+}
+
+func IgnoreTLS() Option {
+	return func(c *CURL) {
+		c.ignoreTLS = true
+	}
+}
+
+func Output(file string) Option {
+	return func(c *CURL) {
+		c.outputFile = file
+	}
+}
+
+func (c *CURL) getOptionFormat(s string) string {
+	if c.longFormat {
+		if longFormatOption, ok := longFormatOptionsMap[s]; ok {
+			return longFormatOption
+		}
+	}
+	return s
+}
+
+func (c *CURL) String() string {
+	if c == nil {
+		return ""
+	}
+
+	curl := []string{"curl"}
+
+	if c.proxy != "" {
+		curl = append(curl, c.getOptionFormat("-x"), bashStr(c.proxy))
+	}
+
+	if c.followRedirect {
+		curl = append(curl, c.getOptionFormat("-L"))
+	}
+
+	if c.timeout > 0 {
+		curl = append(curl, c.getOptionFormat("-m"), fmt.Sprintf("%d", c.timeout))
+	}
+
+	if c.ignoreTLS {
+		curl = append(curl, c.getOptionFormat("-k"))
+	}
+
+	curl = append(curl, c.getOptionFormat("-X"), bashStr(c.method))
+
+	curl = append(curl, bashStr(c.url))
+
+	for k, v := range c.header {
+		curl = append(curl, c.getOptionFormat("-H"), bashStr(fmt.Sprintf("%s: %s", k, v[0])))
+	}
+
+	if c.body != "" {
+		curl = append(curl, c.getOptionFormat("-d"), bashStr(c.body))
+	}
+
+	return strings.Join(curl, " ")
 }
 
 func bashStr(s string) string {
@@ -79,10 +151,6 @@ func build(r *http.Request) (*CURL, error) {
 	}
 
 	c.url = requestURL
-
-	if schema == "https" {
-		c.tlsFlag = true
-	}
 
 	if r.Body != nil {
 		var buf bytes.Buffer
