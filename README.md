@@ -1,5 +1,5 @@
 # g2curl
 
-Generate `cURL` command form Go `http.Request`.
+Generate `cURL` command from Go `http.Request` like `moul/http2curl` but with more options.
 
-just like `moul/http2curl`
+Thanks to `moul/http2curl`.
