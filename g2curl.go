@@ -84,6 +84,12 @@ func Output(file string) Option {
 	}
 }
 
+func MultiLine() Option {
+	return func(c *CURL) {
+		c.multiLine = true
+	}
+}
+
 func (c *CURL) getOptionFormat(s string) string {
 	if c.longFormat {
 		if longFormatOption, ok := longFormatOptionsMap[s]; ok {
@@ -120,8 +126,15 @@ func (c *CURL) String() string {
 
 	curl = append(curl, bashStr(c.url))
 
+	if c.multiLine {
+		curl = append(curl, "\\\n   ")
+	}
+
 	for k, v := range c.header {
 		curl = append(curl, c.getOptionFormat("-H"), bashStr(fmt.Sprintf("%s: %s", k, v[0])))
+		if c.multiLine {
+			curl = append(curl, "\\\n   ")
+		}
 	}
 
 	if c.body != "" {
